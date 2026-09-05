@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HP Style Label Generator</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --em: #10b981;
+      --em-light: #d1fae5;
+      --glass: rgba(255, 255, 255, 0.62);
+      --glass-border: rgba(255, 255, 255, 0.72);
+      --blur: blur(14px);
+      --shadow: 0 4px 18px rgba(0, 0, 0, 0.05);
+      --radius: 16px;
+      --transition: all 0.2s ease;
+      --ink: #20242a;
+      --muted: #98a1a8;
+      --sticker-border: #7f8da3;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f9fafb;
+      color: #111827;
+      min-height: 100vh;
+      padding: 0 16px 40px;
+      line-height: 1.5;
+    }
+
+    .container { max-width: 1200px; margin: 0 auto; }
+
+    .header {
+      text-align: center;
+      margin: -40px -16px 32px;
+      padding: 50px 24px 44px;
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+    }
+
+    .header .logo {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(0.85rem, 1.5vw, 1rem);
+      letter-spacing: 2px;
+      color: rgba(16, 185, 129, 0.7);
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      font-weight: 500;
+    }
+
+    .header h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2.2rem, 5vw, 3.4rem);
+      font-weight: 700;
+      color: var(--em);
+      letter-spacing: -1px;
+      margin-bottom: 18px;
+      line-height: 1.15;
+    }
+
+    .header .divider {
+      width: 80px;
+      height: 2px;
+      margin: 0 auto;
+      background: linear-gradient(90deg, transparent, var(--em), transparent);
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.4fr;
+      gap: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--glass);
+      backdrop-filter: var(--blur);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      padding: 28px;
+      box-shadow: var(--shadow);
+      transition: var(--transition);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card:hover {
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.07);
+      transform: translateY(-2px);
+    }
+
+    .section-label {
+      font-family: 'Sora', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--em);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-label::before {
+      content: '';
+      width: 20px;
+      height: 2px;
+      background: var(--em);
+      border-radius: 1px;
+    }
+
+    .field { margin-bottom: 20px; }
+    .field:last-child { margin-bottom: 0; }
+
+    .form-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-family: 'Sora', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .form-label .tag {
+      color: var(--em);
+      font-weight: 700;
+    }
+
+    input[type=text] {
+      width: 100%;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      color: #111827;
+      background: rgba(255, 255, 255, 0.45);
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 11px 14px;
+      outline: none;
+      transition: var(--transition);
+      letter-spacing: 0.03em;
+    }
+
+    input[type=text]:focus {
+      border-color: var(--em);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+      background: rgba(255, 255, 255, 0.76);
+    }
+
+    input[type=text].invalid {
+      border-color: #ef4444;
+      background: rgba(239, 68, 68, 0.05);
+    }
+
+    .msg {
+      margin-top: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      min-height: 15px;
+    }
+
+    .msg.hint { color: #6b7280; }
+    .msg.ok { color: var(--em); }
+    .msg.err { color: #ef4444; }
+
+    .button-group {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    button {
+      flex: 1;
+      font-family: 'Sora', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 12px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: var(--transition);
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--em);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #059669;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(5, 150, 105, 0.2);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: var(--em);
+      border: 1px solid var(--em);
+    }
+
+    .btn-secondary:hover {
+      background: var(--em-light);
+    }
+
+    .stage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      width: 100%;
+      height: 100%;
+      justify-content: center;
+      border: 1px solid var(--em);
+      border-radius: 10px;
+      background: white;
+    }
+
+    .label-wrap {
+      width: 100%;
+      max-width: 760px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .label-frame {
+      width: 100%;
+      aspect-ratio: 3.35 / 1;
+      background: linear-gradient(180deg, #ffffff 0%, #f7f9fc 100%);
+      border: 3px solid var(--sticker-border);
+      border-radius: 34px;
+      box-shadow: 0 14px 30px rgba(0,0,0,0.12);
+      padding: 22px 28px 18px 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      overflow: hidden;
+    }
+
+    .top-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 18px;
+    }
+
+    .hp-logo {
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: #2b3550;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: Arial, sans-serif;
+      font-style: italic;
+      font-weight: 700;
+      font-size: 24px;
+      line-height: 1;
+      flex: 0 0 54px;
+      user-select: none;
+    }
+
+    .barcode-zone {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      min-height: 88px;
+    }
+
+    .barcode-placeholder {
+      width: 100%;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+    }
+
+    .barcode-svg {
+      width: 100%;
+      height: 86px;
+      display: block;
+    }
+
+    .bottom-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: nowrap;
+      min-height: 42px;
+    }
+
+    .boxed-sn {
+      border: 2px solid var(--ink);
+      padding: 4px 10px 3px;
+      font-family: Arial, sans-serif;
+      font-size: clamp(15px, 1.8vw, 18px);
+      color: var(--ink);
+      white-space: nowrap;
+      flex: 0 1 auto;
+    }
+
+    .boxed-sn.placeholder {
+      color: var(--muted);
+      border-color: #b7bfc8;
+    }
+
+    .fpu-text,
+    .brand-text {
+      font-family: Arial, sans-serif;
+      font-size: clamp(15px, 1.8vw, 18px);
+      color: var(--ink);
+      white-space: nowrap;
+    }
+
+    .fpu-text.placeholder,
+    .brand-text.placeholder {
+      color: var(--muted);
+    }
+
+    .stage-caption {
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 16px;
+      text-align: center;
+      max-width: 460px;
+      line-height: 1.5;
+    }
+
+    .toast {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: var(--blur);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      box-shadow: var(--shadow);
+      transform: translateX(120%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+      z-index: 2000;
+      min-width: 220px;
+      opacity: 0;
+    }
+
+    .toast.show { transform: translateX(0); opacity: 1; }
+
+    .toast-content {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #111827;
+    }
+
+    .toast-icon {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    .toast-success .toast-icon { background: rgba(16, 185, 129, 0.2); color: var(--em); }
+    .toast-error .toast-icon { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .toast-info .toast-icon { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
+
+    .toast-message {
+      font-size: 13px;
+      font-weight: 500;
+      flex: 1;
+    }
+
+    @media (max-width: 900px) {
+      .toast { top: 16px; right: 16px; left: 16px; width: auto; }
+    }
+
+    @media (max-width: 600px) {
+      body { padding: 0 12px 32px; }
+      .header { margin: -12px -12px 20px; padding: 32px 16px 28px; }
+      .card { padding: 16px; }
+      .button-group { flex-direction: column; gap: 8px; margin-top: 16px; }
+      button { width: 100%; }
+      .stage { padding: 14px; }
+      .label-frame { padding: 16px; border-radius: 24px; }
+      .hp-logo { width: 42px; height: 42px; font-size: 19px; flex-basis: 42px; }
+      .barcode-zone { min-height: 62px; }
+      .barcode-svg { height: 58px; }
+      .bottom-row { gap: 8px; }
+      .boxed-sn, .fpu-text, .brand-text { font-size: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span class="logo">Abhishek Rasal's</span>
+      <h1>HP Style Label Generator</h1>
+      <div class="divider"></div>
+    </div>
+
+    <div class="main-grid">
+      <div class="card">
+        <div class="section-label">01. Input Data</div>
+
+        <div class="field">
+          <label class="form-label">Serial Number (Barcode Value) <span class="tag">TYPE-AUTO</span></label>
+          <input type="text" id="serialInput" placeholder="e.g. TH4CK7B0QY6UU4764004" autocomplete="off" spellcheck="false">
+          <div class="msg hint" id="serialMsg">Type → barcode generates instantly.</div>
+        </div>
+
+        <div class="field">
+          <label class="form-label">FPU Number <span class="tag">FPU</span></label>
+          <input type="text" id="fpuInput" placeholder="e.g. 6UU47-64004" autocomplete="off" spellcheck="false">
+          <div class="msg hint" id="fpuMsg">Shown after the boxed serial.</div>
+        </div>
+
+        <div class="field">
+          <label class="form-label">Company Text <span class="tag">RIGHT TEXT</span></label>
+          <input type="text" id="brandInput" placeholder="e.g. HP Inc." autocomplete="off" spellcheck="false" value="HP Inc.">
+          <div class="msg hint" id="brandMsg">Brand text shown at the right side.</div>
+        </div>
+
+        <div class="button-group">
+          <button class="btn-secondary" id="clearBtn">Clear Fields</button>
+          <button class="btn-secondary" id="generateBtn">Render</button>
+        </div>
+
+        <div class="button-group" style="margin-top: 10px;">
+          <button class="btn-primary" id="downloadBtn">Download JPG Label</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-label">02. Live Preview</div>
+
+        <div class="stage">
+          <div class="label-wrap">
+            <div class="label-frame" id="labelFrame">
+              <div class="top-row">
+                <div class="hp-logo">hp</div>
+
+                <div class="barcode-zone">
+                  <div class="barcode-placeholder" id="barcodePlaceholder">ENTER SERIAL TO GENERATE</div>
+                  <svg class="barcode-svg" id="barcodeSvg" style="display:none;"></svg>
+                </div>
+              </div>
+
+              <div class="bottom-row">
+                <div class="boxed-sn placeholder" id="serialCaption">S/N: -----------</div>
+                <div class="fpu-text placeholder" id="fpuCaption">FPU: ----------</div>
+                <div class="brand-text" id="brandCaption">HP Inc.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stage-caption">
+            Type in the Serial field → Both barcode and S/N box update instantly.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    let toastTimeout;
+
+    function showToast(message, type = 'success') {
+      const toast = document.getElementById('toast');
+      toast.className = `toast toast-${type} show`;
+      toast.innerHTML = `
+        <div class="toast-content">
+          <div class="toast-icon">${getToastIcon(type)}</div>
+          <div class="toast-message">${message}</div>
+        </div>
+      `;
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => toast.classList.remove('show'), 3000);
+    }
+
+    function getToastIcon(type) {
+      switch (type) {
+        case 'success': return '✓';
+        case 'error': return '✗';
+        case 'info': return 'ℹ';
+        default: return 'ℹ';
+      }
+    }
+
+    const VALID_PATTERN = /^[\x20-\x7E]*$/;
+
+    function validate(value, required = false) {
+      if (value.trim().length === 0) {
+        return required
+          ? { ok: false, empty: true, msg: 'This field is empty.' }
+          : { ok: false, empty: true };
+      }
+      if (!VALID_PATTERN.test(value)) {
+        return { ok: false, empty: false, msg: 'Unsupported character — use standard printable ASCII.' };
+      }
+      return { ok: true, empty: false, msg: 'Valid.' };
+    }
+
+    function updateEverything() {
+      const serialValue = serialInput.value.trim();
+      const fpuValue = fpuInput.value.trim();
+      const brandValue = brandInput.value.trim();
+
+      // Update barcode from serial number
+      const svg = document.getElementById('barcodeSvg');
+      const placeholder = document.getElementById('barcodePlaceholder');
+      const serialMsg = document.getElementById('serialMsg');
+      const input = document.getElementById('serialInput');
+      const serialResult = validate(serialValue);
+
+      // Update S/N box
+      const serialBox = document.getElementById('serialCaption');
+      const fpuBox = document.getElementById('fpuCaption');
+      const brandBox = document.getElementById('brandCaption');
+
+      // --- Main barcode generation ---
+      if (serialResult.empty) {
+        svg.style.display = 'none';
+        placeholder.style.display = 'block';
+        placeholder.textContent = 'ENTER SERIAL TO GENERATE';
+        input.classList.remove('invalid');
+        serialMsg.className = 'msg hint';
+        serialMsg.textContent = 'Type → barcode generates instantly.';
+        serialBox.textContent = 'S/N: -----------';
+        serialBox.classList.add('placeholder');
+      } else if (!serialResult.ok) {
+        svg.style.display = 'none';
+        placeholder.style.display = 'block';
+        placeholder.textContent = 'INVALID INPUT';
+        input.classList.add('invalid');
+        serialMsg.className = 'msg err';
+        serialMsg.textContent = serialResult.msg;
+        serialBox.textContent = 'S/N: ' + serialValue;
+        serialBox.classList.remove('placeholder');
+      } else {
+        try {
+          JsBarcode(svg, serialValue, {
+            format: 'CODE128',
+            lineColor: '#1d2430',
+            background: 'transparent',
+            width: 2.1,
+            height: 72,
+            displayValue: false,
+            margin: 0
+          });
+
+          svg.setAttribute('preserveAspectRatio', 'none');
+          placeholder.style.display = 'none';
+          svg.style.display = 'block';
+          input.classList.remove('invalid');
+          serialMsg.className = 'msg ok';
+          serialMsg.textContent = 'Valid — barcode generated.';
+          serialBox.textContent = 'S/N: ' + serialValue;
+          serialBox.classList.remove('placeholder');
+        } catch (e) {
+          svg.style.display = 'none';
+          placeholder.style.display = 'block';
+          placeholder.textContent = 'ENCODING ERROR';
+          input.classList.add('invalid');
+          serialMsg.className = 'msg err';
+          serialMsg.textContent = 'Encoding error — try a shorter value.';
+          serialBox.textContent = 'S/N: ' + serialValue;
+          serialBox.classList.remove('placeholder');
+        }
+      }
+
+      // --- FPU field ---
+      const fpuMsg = document.getElementById('fpuMsg');
+      const fpuInputEl = document.getElementById('fpuInput');
+      const fpuResult = validate(fpuValue, false);
+
+      if (fpuResult.empty) {
+        fpuBox.textContent = 'FPU: ----------';
+        fpuBox.classList.add('placeholder');
+        fpuInputEl.classList.remove('invalid');
+        fpuMsg.className = 'msg hint';
+        fpuMsg.textContent = 'Shown after the boxed serial.';
+      } else if (!fpuResult.ok) {
+        fpuBox.textContent = 'FPU: ' + fpuValue;
+        fpuBox.classList.remove('placeholder');
+        fpuInputEl.classList.add('invalid');
+        fpuMsg.className = 'msg err';
+        fpuMsg.textContent = fpuResult.msg;
+      } else {
+        fpuBox.textContent = 'FPU: ' + fpuValue;
+        fpuBox.classList.remove('placeholder');
+        fpuInputEl.classList.remove('invalid');
+        fpuMsg.className = 'msg ok';
+        fpuMsg.textContent = 'Valid.';
+      }
+
+      // --- Brand field ---
+      const brandMsg = document.getElementById('brandMsg');
+      const brandInputEl = document.getElementById('brandInput');
+      const brandResult = validate(brandValue, false);
+
+      if (brandResult.empty) {
+        brandBox.textContent = 'HP Inc.';
+        brandBox.classList.remove('placeholder');
+        brandInputEl.classList.remove('invalid');
+        brandMsg.className = 'msg hint';
+        brandMsg.textContent = 'Brand text shown at the right side.';
+      } else if (!brandResult.ok) {
+        brandBox.textContent = brandValue;
+        brandInputEl.classList.add('invalid');
+        brandMsg.className = 'msg err';
+        brandMsg.textContent = brandResult.msg;
+      } else {
+        brandBox.textContent = brandValue;
+        brandBox.classList.remove('placeholder');
+        brandInputEl.classList.remove('invalid');
+        brandMsg.className = 'msg ok';
+        brandMsg.textContent = 'Valid.';
+      }
+    }
+
+    const serialInput = document.getElementById('serialInput');
+    const fpuInput = document.getElementById('fpuInput');
+    const brandInput = document.getElementById('brandInput');
+
+    // Real-time updates on every keystroke
+    serialInput.addEventListener('input', updateEverything);
+    fpuInput.addEventListener('input', updateEverything);
+    brandInput.addEventListener('input', updateEverything);
+
+    // Render button for explicit refresh
+    document.getElementById('generateBtn').addEventListener('click', () => {
+      updateEverything();
+      showToast('Label rendered', 'success');
+    });
+
+    // Clear button
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      serialInput.value = '';
+      fpuInput.value = '';
+      brandInput.value = 'HP Inc.';
+
+      updateEverything();
+      serialInput.focus();
+      showToast('Fields cleared', 'info');
+    });
+
+    // Canvas generation for download
+    function roundRect(ctx, x, y, w, h, r) {
+      const radius = Math.min(r, w / 2, h / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + radius, y);
+      ctx.lineTo(x + w - radius, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
+      ctx.lineTo(x + w, y + h - radius);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+      ctx.lineTo(x + radius, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
+      ctx.lineTo(x, y + radius);
+      ctx.quadraticCurveTo(x, y, x + radius, y);
+      ctx.closePath();
+    }
+
+    function drawHpLogo(ctx, x, y, size) {
+      ctx.save();
+      ctx.fillStyle = '#2b3550';
+      ctx.beginPath();
+      ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `italic 700 ${Math.round(size * 0.48)}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('hp', x + size / 2, y + size / 2 + 1);
+      ctx.restore();
+    }
+
+    function drawBarcodeOnCanvas(ctx, value, x, y, w, h) {
+      const result = validate(value);
+
+      if (!result.ok) {
+        ctx.save();
+        ctx.fillStyle = '#9aa2a7';
+        ctx.font = '400 20px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(result.empty ? 'NO BARCODE DATA' : 'INVALID INPUT', x + w / 2, y + h / 2);
+        ctx.restore();
+        return;
+      }
+
+      try {
+        const barcodeCanvas = document.createElement('canvas');
+        JsBarcode(barcodeCanvas, value, {
+          format: 'CODE128',
+          lineColor: '#1d2430',
+          background: 'rgba(0,0,0,0)',
+          width: 4,
+          height: 180,
+          displayValue: false,
+          margin:104       
+        });
+        ctx.drawImage(barcodeCanvas, x, y, w, h);
+      } catch (e) {
+        ctx.save();
+        ctx.fillStyle = '#ef4444';
+        ctx.font = '400 20px "JetBrains Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('ENCODING ERROR', x + w / 2, y + h / 2);
+        ctx.restore();
+      }
+    }
+
+    async function buildLabelCanvas() {
+      if (document.fonts && document.fonts.ready) {
+        await document.fonts.ready;
+      }
+
+      const W = 1600;
+      const H = 480;
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+
+      ctx.clearRect(0, 0, W, H);
+
+      const x = 20;
+      const y = 20;
+      const w = W - 40;
+      const h = H - 40;
+
+      const bg = ctx.createLinearGradient(0, y, 0, y + h);
+      bg.addColorStop(0, '#ffffff');
+      bg.addColorStop(1, '#f7f9fc');
+
+      ctx.save();
+      roundRect(ctx, x, y, w, h, 56);
+      ctx.fillStyle = bg;
+      ctx.fill();
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = '#7f8da3';
+      ctx.stroke();
+      ctx.restore();
+
+      const padX = 52;
+      const topY = 58;
+      const logoSize = 76;
+
+      drawHpLogo(ctx, padX, topY - 4, logoSize);
+
+      const barcodeX = padX + logoSize + 24;
+      const barcodeY = topY + 14;
+      const barcodeW = w - (barcodeX - x) - 56;
+      const barcodeH = 120;
+
+      drawBarcodeOnCanvas(ctx, serialInput.value.trim(), barcodeX, barcodeY, barcodeW, barcodeH);
+
+      const bottomY = 314;
+      const snText = serialInput.value.trim() ? `S/N: ${serialInput.value.trim()}` : 'S/N: -----------';
+      const fpuText = fpuInput.value.trim() ? `FPU: ${fpuInput.value.trim()}` : 'FPU: ----------';
+      const brandText = brandInput.value.trim() || 'HP Inc.';
+
+      ctx.save();
+      ctx.font = '400 42px Arial';
+      ctx.textBaseline = 'middle';
+      ctx.textAlign = 'left';
+
+      const snBoxX = padX + 8;
+      const snBoxY = bottomY;
+      const snPadX = 14;
+      const snBoxH = 56;
+      const snTextW = ctx.measureText(snText).width;
+      const snBoxW = snTextW + snPadX * 2;
+
+      ctx.strokeStyle = serialInput.value.trim() ? '#20242a' : '#b7bfc8';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(snBoxX, snBoxY, snBoxW, snBoxH);
+
+      ctx.fillStyle = serialInput.value.trim() ? '#20242a' : '#98a1a8';
+      ctx.fillText(snText, snBoxX + snPadX, snBoxY + snBoxH / 2 + 1);
+
+      const fpuX = snBoxX + snBoxW + 26;
+      ctx.fillStyle = fpuInput.value.trim() ? '#20242a' : '#98a1a8';
+      ctx.fillText(fpuText, fpuX, snBoxY + snBoxH / 2 + 1);
+
+      const fpuW = ctx.measureText(fpuText).width;
+      const brandX = fpuX + fpuW + 30;
+      ctx.fillStyle = '#20242a';
+      ctx.fillText(brandText, brandX, snBoxY + snBoxH / 2 + 1);
+
+      ctx.restore();
+
+      return canvas;
+    }
+
+    document.getElementById('downloadBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('downloadBtn');
+      const original = btn.textContent;
+      btn.textContent = 'Preparing…';
+
+      try {
+        const canvas = await buildLabelCanvas();
+        const link = document.createElement('a');
+        const name = (serialInput.value.trim() || 'hp_label').replace(/[^a-z0-9\-_]/gi, '_');
+        link.download = `${name}_label.jpg`;
+        link.href = canvas.toDataURL('image/jpeg', 0.95);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        showToast('Label downloaded successfully!', 'success');
+      } catch (e) {
+        showToast('Could not generate the download. Please try again.', 'error');
+      } finally {
+        btn.textContent = original;
+      }
+    });
+
+    // Initial render
+    updateEverything();
+  </script>
+</body>
+</html>
