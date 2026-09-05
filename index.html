@@ -6,6 +6,7 @@
   <title>HP Style Label Generator</title>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.5/JsBarcode.all.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&family=Sora:wght@600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
   <style>
@@ -142,7 +143,7 @@
       background: #ffffff;
       border: 2px solid #d1d5db;
       border-radius: 32px;
-      padding: 20px 24px 20px 20px;
+      padding: 20px 12px 20px 20px;
       display: inline-flex;
       flex-direction: column;
       gap: 10px;
@@ -159,7 +160,7 @@
     /* ── BARCODE IMG (preview) ── */
     #barcodeImg {
       display: block;
-      height: 70px;
+      height: 40px;
       image-rendering: crisp-edges;
     }
 
@@ -245,6 +246,7 @@
       <div class="button-group">
         <button class="btn-secondary" id="clearBtn">Clear</button>
         <button class="btn-primary" id="downloadBtn">Download JPG</button>
+        <button class="btn-primary" id="exportPreviewBtn" style="background: #f59e0b; flex: 0.8;">Export Preview</button>
       </div>
     </div>
 
@@ -295,6 +297,12 @@ const labelFrame      = document.getElementById('labelFrame');
 const barcodeImg      = document.getElementById('barcodeImg');
 const barcodePlaceholder = document.getElementById('barcodePlaceholder');
 
+/* ── BARCODE CACHE (ensures preview and download use identical barcode) ── */
+let cachedBarcodeCanvas = null;
+let cachedBarcodeSerial = null;
+let cachedBarcodeWidth  = null;
+let cachedBarcodeHeight = null;
+
 /* ── toast ── */
 function showToast(msg) {
   const t = document.getElementById('toast');
@@ -313,9 +321,9 @@ function getLabelData() {
 }
 
 /* ─────────────────────────────────────────────────────────
-   SINGLE SOURCE OF TRUTH:
-   buildBarcodeCanvas(serial, pixelWidth, pixelHeight)
-   → always returns the same canvas for the same inputs
+   BUILD BARCODE CANVAS
+   – renders JsBarcode at exact target dimensions
+   – no data URL conversion (preserves fidelity)
 ───────────────────────────────────────────────────────── */
 function buildBarcodeCanvas(serial, targetW, targetH) {
   /* 1. Let JsBarcode render at its natural size */
@@ -339,9 +347,29 @@ function buildBarcodeCanvas(serial, targetW, targetH) {
 }
 
 /* ─────────────────────────────────────────────────────────
+   GET OR BUILD CACHED BARCODE
+   – reuse same canvas if serial/width/height unchanged
+   – guarantees preview and download show identical barcode
+───────────────────────────────────────────────────────── */
+function getBarcodeCanvas(serial, width, height) {
+  if (cachedBarcodeCanvas 
+      && cachedBarcodeSerial === serial 
+      && cachedBarcodeWidth === width 
+      && cachedBarcodeHeight === height) {
+    return cachedBarcodeCanvas;
+  }
+
+  cachedBarcodeCanvas = buildBarcodeCanvas(serial, width, height);
+  cachedBarcodeSerial = serial;
+  cachedBarcodeWidth  = width;
+  cachedBarcodeHeight = height;
+  return cachedBarcodeCanvas;
+}
+
+/* ─────────────────────────────────────────────────────────
    UPDATE PREVIEW
    – text row is laid out by CSS first
-   – barcode width = text row width   (exact match)
+   – barcode width = from start of S/N box to end of brand text
 ───────────────────────────────────────────────────────── */
 function updatePreview() {
   const { serial, fpu, brand } = getLabelData();
@@ -359,10 +387,20 @@ function updatePreview() {
 
   /* wait one frame so the browser has reflowed the text row */
   requestAnimationFrame(() => {
-    const w = Math.round(textRow.getBoundingClientRect().width);
-    const h = 70;
+    const snBox = document.getElementById('snBox');
+    const brandText = document.getElementById('brandText');
+    
+    const snBoxRect = snBox.getBoundingClientRect();
+    const brandRect = brandText.getBoundingClientRect();
+    
+    /* barcode width = from left of S/N box to right edge of brand text */
+    const barcodeLeft = snBoxRect.left;
+    const barcodeRight = brandRect.right;
+    const w = Math.round(barcodeRight - barcodeLeft);
+    const h = 40;  /* additional 10% less than 45px */
 
-    const bc = buildBarcodeCanvas(serial, w, h);
+    /* get cached barcode (same one will be used in download) */
+    const bc = getBarcodeCanvas(serial, w, h);
     barcodeImg.src          = bc.toDataURL('image/png');
     barcodeImg.width        = w;
     barcodeImg.height       = h;
@@ -377,6 +415,7 @@ function updatePreview() {
    BUILD DOWNLOAD CANVAS
    – measure preview DOM to get exact proportions
    – draw every element at canvas scale
+   – use CACHED barcode (same as preview)
 ───────────────────────────────────────────────────────── */
 async function buildDownloadCanvas() {
   if (document.fonts?.ready) await document.fonts.ready;
@@ -384,7 +423,7 @@ async function buildDownloadCanvas() {
   const { serial, fpu, brand } = getLabelData();
 
   /* ── canvas dimensions ── */
-  const CW = 1400, CH = 320;
+  const CW = 1600, CH = 400;
   const canvas = document.createElement('canvas');
   canvas.width  = CW;
   canvas.height = CH;
@@ -395,14 +434,19 @@ async function buildDownloadCanvas() {
   ctx.fillStyle = '#f3f4f6';
   ctx.fillRect(0, 0, CW, CH);
 
-  /* ── label card ── */
-  const lx = 50, ly = 30, lw = CW - 100, lh = CH - 60;
+  /* ── label card with proper margins ── */
+  const outerMargin = 80;  /* margin around label */
+  const lx = outerMargin;
+  const ly = outerMargin;
+  const lw = CW - (outerMargin * 2);
+  const lh = CH - (outerMargin * 2);
+  
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
-  ctx.roundRect(lx, ly, lw, lh, 40);
+  ctx.roundRect(lx, ly, lw, lh, 50);
   ctx.fill();
   ctx.strokeStyle = '#d1d5db';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 4;
   ctx.stroke();
 
   /* ── measure preview to compute scale ── */
@@ -477,17 +521,22 @@ async function buildDownloadCanvas() {
   ctx.stroke();
 
   /* ── Barcode ── */
-  /* barcode sits between logo bottom and text row top */
-  const bcPreview = barcodeImg.getBoundingClientRect();
-  const bcOX = bcPreview.left - previewFrame.left;
-  const bcOY = bcPreview.top  - previewFrame.top;
+  /* barcode extends from S/N box left to brand text right */
+  const snBoxPreview = labelFrame.querySelector('#snBox').getBoundingClientRect();
+  const brandTextPreview = labelFrame.querySelector('#brandText').getBoundingClientRect();
+  
+  const bcOX = snBoxPreview.left - previewFrame.left;
+  const bcOY = (barcodeImg.getBoundingClientRect().top) - previewFrame.top;
+  const bcWidth = (brandTextPreview.right - snBoxPreview.left);
+  const bcHeight = 40;  /* additional 10% less than 45px */
+  
   const cBcX = lx + bcOX * scaleX;
   const cBcY = ly + bcOY * scaleY;
-  const cBcW = cRowW;                        /* same width as text row */
-  const cBcH = bcPreview.height * scaleY;
+  const cBcW = bcWidth * scaleX;
+  const cBcH = bcHeight * scaleY;
 
-  /* re-render barcode at exact canvas pixel size */
-  const bcCanvas = buildBarcodeCanvas(serial, Math.round(cBcW), Math.round(cBcH));
+  /* ✓ USE CACHED BARCODE (same as preview) */
+  const bcCanvas = getBarcodeCanvas(serial, Math.round(cBcW), Math.round(cBcH));
   ctx.drawImage(bcCanvas, cBcX, cBcY, cBcW, cBcH);
 
   /* ── Text row ── */
@@ -563,6 +612,37 @@ document.getElementById('downloadBtn').addEventListener('click', async () => {
     showToast('Download failed.');
   } finally {
     btn.textContent = 'Download JPG';
+  }
+});
+
+document.getElementById('exportPreviewBtn').addEventListener('click', async () => {
+  const { serial } = getLabelData();
+  if (!serial) { showToast('Enter a serial number first'); return; }
+
+  const btn = document.getElementById('exportPreviewBtn');
+  btn.textContent = 'Capturing…';
+  try {
+    const canvas = await html2canvas(labelFrame, {
+      backgroundColor: '#ffffff',
+      scale: 2,
+      logging: false,
+      useCORS: true,
+      allowTaint: true,
+      imageTimeout: 0
+    });
+
+    const a = document.createElement('a');
+    a.download = `${serial}_preview.jpg`;
+    a.href = canvas.toDataURL('image/jpeg', 0.95);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    showToast('Preview exported!');
+  } catch(e) {
+    console.error(e);
+    showToast('Export failed.');
+  } finally {
+    btn.textContent = 'Export Preview';
   }
 });
 
